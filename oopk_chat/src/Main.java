@@ -13,10 +13,10 @@ public class Main {
 				
 		if (choice == JOptionPane.YES_OPTION) {
 			System.out.println("User chose to become a Server");
-			new Server();
+			//new Server();
 		} else if (choice == JOptionPane.NO_OPTION) {
 			System.out.println("User chose to become a Client");
-			new Client();
+			//new Client();
 		} else {
 			System.out.println("User didn't want to become either a server or a client");
 		}

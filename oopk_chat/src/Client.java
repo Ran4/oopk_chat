@@ -6,6 +6,9 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.net.UnknownHostException;
 
+import javax.swing.JFrame;
+import javax.swing.JOptionPane;
+
 public class Client {
 	ChatWindow cw;
 	Socket s;
@@ -20,6 +23,27 @@ public class Client {
 	
 	public Client() {
 		cw = new ChatWindow(this);
+	}
+	
+	public boolean askHostToAcceptAppeal(String appeal) {
+		Object[] options = {"Accept", "Deny"};
+		int choice = JOptionPane.showOptionDialog(cw, appeal,
+				"Connection request",
+				JOptionPane.YES_NO_CANCEL_OPTION,
+				JOptionPane.INFORMATION_MESSAGE,
+				null, //no custom icon 
+				options, options[0]);
+				
+		if (choice == JOptionPane.YES_OPTION) {
+			System.out.println("Host accepted connection");
+			return true;
+		} else if (choice == JOptionPane.NO_OPTION) {
+			System.out.println("Host didn't accept connection");
+			return false;
+		} else {
+			System.out.println("Host canceled connection request, so no connection was done");
+			return false;
+		}
 	}
 	
 	public String startMessage() {

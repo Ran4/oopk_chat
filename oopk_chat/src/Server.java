@@ -8,21 +8,27 @@ import java.util.ArrayList;
  * since the server can also be used like a client. 
  *
  */
-public class Server extends Client {
-	static {
-		startMessage = "You are a server\n";
-	}
+
+public class Server {
 	
 	ConnectionHandler ch;
+	//messageReceiverHandler mrh;
 	private ArrayList<ServerSender> serverSenderList;
+	private Client host;
 	
-	public Server() {
+	public Server(Client _host, int port) {
+		host = _host;
 		serverSenderList = new ArrayList<ServerSender>();
 		
-		ch = new ConnectionHandler(8080, this);
+		ch = new ConnectionHandler(port, this);
 		Thread t = new Thread(ch);
 		t.start();
 	}
+	
+	public boolean askHostToAcceptAppeal(String appeal) {
+		return (host.askHostToAcceptAppeal(appeal));
+	}
+	
 	
 	public synchronized void addServerSender(ServerSender serverSender) {
 		serverSenderList.add(serverSender);

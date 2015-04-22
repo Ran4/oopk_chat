@@ -24,25 +24,44 @@ public class ConnectionHandler implements Runnable {
             ServerSocket ss = new ServerSocket(port);
             Socket s = null;
             while ( (s = ss.accept()) != null) {
-            	//server.cw.addMessage("Server accepted a connection");
             	System.out.println("ServerSocket accepted a connection");
             	
-                PrintWriter myWriter = new PrintWriter(new OutputStreamWriter(s.getOutputStream()));
-                
-                ServerSender serverSender = new ServerSender(myWriter);
-                
-                server.addServerSender(serverSender);
-                
-                //System.out.println("Just added ");
-                
-                BufferedReader reader = new BufferedReader(new InputStreamReader(s.getInputStream()));
-                (new Thread(new ServerReceiver(reader, server, serverSender))).start();
-                
-                /*
-                BufferedReader reader = new BufferedReader(new InputStreamReader(s.getInputStream()));
-                String name = reader.readLine();
-                (new Thread(new MessageReceiver(name, reader, server, sender))).start();
-                */
+            	BufferedReader reader = new BufferedReader(new InputStreamReader(s.getInputStream()));
+            	
+            	try {
+                    String xmlMessage = "";
+                    while ( (xmlMessage = reader.readLine()) != null && !xmlMessage.isEmpty()) {
+                    	Message msg = null;
+                    	try {
+                    		msg = XMLParser.XMLToMsg(xmlMessage);
+                    	} catch (XMLException e) {
+                    		throw new Error("Shitty xml!");
+                    	} catch (UnsupportedEncryptionTypeException e) {
+                    		throw new Error("Encryption isn't implemented yet!");
+                    	} catch (EncryptionException e) {
+                    		throw new Error("Encryption isn't implemented yet!");
+                    	}
+                    	
+                    	String sender = msg.sender.isEmpty() ? "Some unnamed thing" : msg.sender;
+                    	String appeal = sender + " is trying to connect. It is a " + (msg.isConnectionRequest() ? "pro" : "noob")
+                    			+ ". Message: " + msg.text;
+                    	
+                    	PrintWriter myWriter = new PrintWriter(new OutputStreamWriter(s.getOutputStream()));
+                    	ServerSender serverSender = new ServerSender(myWriter);
+                    	
+                    	if (server.askHostToAcceptAppeal(appeal)) {
+                            server.addServerSender(serverSender);
+                            (new Thread(new ServerReceiver(reader, server, serverSender))).start();
+                    		
+                    	} else try {
+                    			serverSender.sendMessage(XMLParser.msgToXML(Message.createConnectionResponse(true, "")));
+                    	} catch (Exception e) {
+                    	}
+                    	break;
+                    }
+                } catch (IOException e) {
+                    System.out.println("Something went wrong with BufferedReader");
+                }
             }
             ss.close();
         } catch (IOException e) {
