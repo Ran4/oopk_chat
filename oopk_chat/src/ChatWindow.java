@@ -10,6 +10,7 @@ import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.List;
 
 import javax.swing.*;
 import javax.swing.text.AttributeSet;
@@ -21,14 +22,6 @@ import javax.swing.text.StyleContext;
  * Main graphics output class
  */
 public class ChatWindow extends JFrame implements ActionListener, KeyListener {
-	/**
-	 * 
-	 */
-	private static final long serialVersionUID = 1L;
-	private JPanel panel;
-	private JTextPane textPane;
-	private JTextField textField;
-	
 	public static class Command {
 		public static String changeName = "/name ";
 		public static String seeName = "/name";
@@ -41,12 +34,25 @@ public class ChatWindow extends JFrame implements ActionListener, KeyListener {
 		public static String changeEncryptionType = "/encryption ";
 		public static String seeEncryptionType = "/encryption";
 		
+		public static String host = "/host ";
+		public static String hostNoArgument = "/host";
+		
 		public static String join = "/join ";
 		public static String disconnect = "/disconnect";
 		
 		public static String exit = "/exit";
 		public static String quit = "/quit";
 	}
+	
+	private static final long serialVersionUID = 1L;
+	
+	private JPanel roomChooserPanel;
+	
+	private List<JButton> roomButtonList;
+	
+	private List<JPanel> roomPanels;
+	private List<JTextPane> textPanes;
+	private List<JTextField> textFields;
 	
 	private String name;
 	private Color color;
@@ -68,10 +74,20 @@ public class ChatWindow extends JFrame implements ActionListener, KeyListener {
 		
 		//textArea = new JTextArea(client.startMessage());
 		
-		panel = new JPanel();
-
+		roomChooserPanel = new JPanel();
+		
+		
+		List<Room> = new ArrayList<Room>();
+		
+		roomPanels = new ArrayList<JPanel>();
+		textPanes = new ArrayList<JTextPane>();
+		textFields = new ArrayList<JTextField>();
+		
+		JButton defaultRoomButton = new JButton("default room");
+		defaultRoomButton.addActionListener
+		
 		textPane = new JTextPane();
-        panel.add(textPane);
+        roomPanel.add(textPane);
 
         appendToPane(Client.startMessage, Color.BLUE);
 		
@@ -280,6 +296,10 @@ public class ChatWindow extends JFrame implements ActionListener, KeyListener {
 				changeEncryptionType(text);
 			} else if (ltext.equals(Command.seeEncryptionType)) {
 				this.addPlainMessage("Your encryption type is " + this.encryptionType + "\n");
+			} else if (ltext.equals(Command.host)) {
+				
+			} else if (ltext.equals(Command.hostNoArgument)) {
+				this.addPlainMessage("Usage: /host port\n");
 			} else if (ltext.startsWith(Command.seeHelp)) {
 				this.addPlainMessage("Commands: /join, /disconnect, /name, /color, /encryption /help, /exit\n");
 			} else if (ltext.startsWith(Command.join)) {
