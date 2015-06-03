@@ -4,123 +4,70 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.Socket;
-import java.net.UnknownHostException;
+import java.net.SocketException;
 
-import javax.swing.JFrame;
-import javax.swing.JOptionPane;
-
-public class Client {
-	ChatWindow cw;
-	Socket s;
-	Thread clientReaderThread;
-	BufferedReader reader;
-	PrintWriter writer;
-	
-	protected static String startMessage;
-	static {
-		startMessage = "write /join ip:port to connect\n";
-	}
-	
-	public Client() {
-		cw = new ChatWindow(this);
-	}
-	
-	public boolean askHostToAcceptAppeal(String appeal) {
-		Object[] options = {"Accept", "Deny"};
-		int choice = JOptionPane.showOptionDialog(cw, appeal,
-				"Connection request",
-				JOptionPane.YES_NO_CANCEL_OPTION,
-				JOptionPane.INFORMATION_MESSAGE,
-				null, //no custom icon 
-				options, options[0]);
+public class Client implements RoomInterface {
+	private RoomViewer roomViewer;
+	private Socket s;
+	private BufferedReader reader;
+	private PrintWriter writer;
+	public String ip;
+		
+	public Client(RoomViewer _roomViewer, String _ip, int port) throws IOException {
+		roomViewer = _roomViewer;
+		ip = _ip;
+		
+		s = new Socket(ip, port);
+		
+		reader = new BufferedReader(new InputStreamReader(s.getInputStream()));
+		beginReceiverThread();
+		
+		writer = new PrintWriter(new OutputStreamWriter(s.getOutputStream()));
 				
-		if (choice == JOptionPane.YES_OPTION) {
-			System.out.println("Host accepted connection");
-			return true;
-		} else if (choice == JOptionPane.NO_OPTION) {
-			System.out.println("Host didn't accept connection");
-			return false;
-		} else {
-			System.out.println("Host canceled connection request, so no connection was done");
-			return false;
-		}
+		if (reader == null) throw new IOException("Couldn't creater a reader");
+		if (writer == null) throw new IOException("Couldn't create a writer");
 	}
 	
-	public String startMessage() {
-		return startMessage;
+	private void beginReceiverThread() {
+		new Thread(new Runnable() {
+		    public void run() {
+		        try {
+		            String xmlMessage;
+		            while( (xmlMessage = reader.readLine()) != null) {
+		                roomViewer.receiveMessage(xmlMessage);
+		            }
+		        } catch (SocketException e) {
+		        	if (!e.getMessage().equals("Socket closed")) e.printStackTrace();
+		        } catch (IOException e) {
+		        	e.printStackTrace();
+		        }
+		    }
+		}).start();
 	}
 	
 	public void sendMessage(String xmlMessage) {
-		if (s == null || !s.isConnected())
-		{
-			//textArea.append("Isn't connected to any server. Write /join ip:port" + "\n");
+		if (s == null || !s.isConnected()) {
 			System.out.println("Client is talking to itself...");
 		} else {
 			if (writer == null) {
 				System.out.println("writer is null");
-				cw.addMessage("Couldn't send to server (writer is null)");
+				roomViewer.addPlainMessage("Couldn't send to server (writer is null)");
 			} else {
 				writer.println(xmlMessage);
 		        writer.flush();
 		        
-		        cw.addMessage("Successfully sent to server");
+		        System.out.println("In Client.java, sent message: " + xmlMessage);
 			}
 		}
 	}
-	
-	public void addConnection(String ip, int port) throws UnknownHostException, IOException {
-		s = new Socket(ip, port);
-		
-		reader = new BufferedReader(new InputStreamReader(s.getInputStream()));
-		
-		Thread clientReaderThread = new Thread(new Runnable() {
-		    public void run() {
-		        try {
-		            String message;
-		            while( (message = reader.readLine()) != null) {
-		                System.out.println("got message" + message);
-		                cw.addMessage(message);
-		            }
-		        } catch (IOException e) {
-		            System.out.println("Something went wrong with BufferedReader");
-		        }
-		    }
-		});
-		
-		clientReaderThread.start();
-		
-		writer = new PrintWriter(new OutputStreamWriter(s.getOutputStream()));
-		
-		if (reader == null) {
-			System.out.println("Couldn't create a reader");
-		}
-		if (writer == null) {
-			System.out.println("Couldn't create a writer");
-		}
-	}
-	
-	public void closeConnection() throws IOException {
+
+	public void disconnect() {
 		try {
-			if (s != null)
-				s.close();
-			/*
-			if (reader != null && reader.ready()) {
-				//reader.close();
-				
-			}
-			
-			if (writer != null) {
-				writer.close();
-			}
-			
-			if (clientReaderThread.isAlive())
-				clientReaderThread.stop();
-			*/
-			
-			System.out.println("Done closing connection");
-			
+			if (s != null) s.close();
+			if (reader != null) reader.close();
+			if (writer != null) writer.close();
 		} catch (IOException e) {
-			System.out.println("Problems closing socket");
+			e.printStackTrace();
 		}
 	}
 }

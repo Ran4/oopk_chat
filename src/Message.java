@@ -7,6 +7,8 @@ import java.util.ArrayList;
  */
 
 public class Message {
+	private static final String no = "no"; // no
+
 	/**
 	 * Escapes special characters in the input string and returns the result.
 	 */
@@ -60,18 +62,28 @@ public class Message {
 	//0 if normal message, 1 if connection request, 2 if connection response, 3 if file request, 4 if file response,
 	//5 if disconnect, 6 if key request
 	public final int messageType;
+	//true iff the decryption of the inbound message failed
+	public final boolean decryptionFailed;
+	//true iff the encryption type of the inbound message is unsupported
+	public final boolean encryptionTypeUnsupported;
+	//true iff the file size of the proposed inbound file transfer is not a number or is negative
+	public final boolean fileSizeInvalid;
+	//true iff the encryption type of the proposed inbound file transfer is unsupported
+	public final boolean fileEncryptionTypeUnsupported;
+	//true iff port of the accepted outbound file transfer is not a number or is negative
+	public final boolean portInvalid;
 
 	/**
 	 * Constructor for all outbound messages.
 	 */
-	private Message(String _text, String _encryptionType, String _color, String _fileName, String _fileSize,
+	private Message(String _text, String _encryptionType, Color _color, String _fileName, String _fileSize,
 					String _fileEncryptionType, String _fileReply, String _port, String _connectionReply,
 					String _sender, int _messageType)
 			throws EncryptionException, UnsupportedEncryptionTypeException {
-		text = _encryptionType.isEmpty() ? makeEscape(_text) : Crypto.encrypt(_encryptionType, _text);
+		text = _encryptionType.isEmpty() ? makeEscape(_text) : Crypto.encrypt(_text, _encryptionType);
 		encryptionType = makeEscape(_encryptionType);
 		key = _encryptionType.isEmpty() ? "" : Crypto.getKey(_encryptionType);
-		color = _color;
+		color = _color == null ? "" : "#" + String.format("%06x", _color.getRGB() & 0x00FFFFFF);
 		fileName = makeEscape(_fileName);
 		fileSize = _fileSize;
 		fileEncryptionType = makeEscape(_fileEncryptionType);
@@ -81,6 +93,15 @@ public class Message {
 		connectionReply = _connectionReply;
 		sender = makeEscape(_sender);
 		messageType = _messageType;
+		decryptionFailed = false;
+		encryptionTypeUnsupported = false;
+		if (!_fileSize.isEmpty() && Integer.parseInt(_fileSize) < 0) throw new NumberFormatException();
+		fileSizeInvalid = false;
+		if (!_fileEncryptionType.isEmpty() && !Crypto.isSupported(_fileEncryptionType))
+			throw new UnsupportedEncryptionTypeException(true);
+		fileEncryptionTypeUnsupported = false;
+		if (!_port.isEmpty() && Integer.parseInt(_port) < 0) throw new NumberFormatException();
+		portInvalid = false;
 	}
 
 	/**
@@ -90,18 +111,36 @@ public class Message {
 	 */
 	private Message(List<List<String>> textList, String _color, String _fileName, String _fileSize,
 					String _fileEncryptionType, String _fileKey, String _fileReply, String _port,
-					String _connectionReply, String _sender, int _messageType)
-			throws EncryptionException, UnsupportedEncryptionTypeException {
-		StringBuilder textBuilder = new StringBuilder();
-		for (List<String> textPart : textList) {
-			String t = textPart.get(0);
-			if (textPart.size() != 1) {
-				String type = textPart.get(1);
-				String key = textPart.get(2);
-				textBuilder.append(Crypto.decrypt(type, t, key));
-			} else textBuilder.append(t);
+					String _connectionReply, String _sender, int _messageType) {
+		String tempText;
+		boolean tempDecryptionFailed;
+		boolean tempEncryptionTypeUnsupported;
+		try {
+			StringBuilder textBuilder = new StringBuilder();
+			for (List<String> textPart : textList) {
+				String t = textPart.get(0);
+				if (textPart.size() != 1) {
+					String type = textPart.get(1);
+					String key = textPart.get(2);
+					textBuilder.append(Crypto.decrypt(t, key, type));
+				} else textBuilder.append(t);
+			}
+			tempText = textBuilder.toString();
+			tempDecryptionFailed = false;
+			tempEncryptionTypeUnsupported = false;
+		} catch (EncryptionException e) {
+			tempText = "";
+			tempDecryptionFailed = true;
+			tempEncryptionTypeUnsupported = false;
+		} catch (UnsupportedEncryptionTypeException e) {
+			tempText = "";
+			tempDecryptionFailed = false;
+			tempEncryptionTypeUnsupported = true;
 		}
-		text = textBuilder.toString();
+		text = tempText;
+		decryptionFailed = tempDecryptionFailed;
+		encryptionTypeUnsupported = tempEncryptionTypeUnsupported;
+
 		encryptionType = "";
 		key = "";
 		color = fixColor(_color);
@@ -114,6 +153,26 @@ public class Message {
 		connectionReply = _connectionReply;
 		sender = _sender;
 		messageType = _messageType;
+		
+		boolean tempFileSizeInvalid;
+		try {
+			if (!_fileSize.isEmpty() && Integer.parseInt(_fileSize) < 1) throw new NumberFormatException();
+			tempFileSizeInvalid = false;
+		} catch (NumberFormatException e) {
+			tempFileSizeInvalid = true;
+		}
+		fileSizeInvalid = tempFileSizeInvalid;
+		
+		fileEncryptionTypeUnsupported = fileEncryptionType.isEmpty() ? false : !Crypto.isSupported(fileEncryptionType);
+		
+		boolean tempPortInvalid;
+		try {
+			if (!_port.isEmpty() && Integer.parseInt(_port) < 1) throw new NumberFormatException();
+			tempPortInvalid = false;
+		} catch (NumberFormatException e) {
+			tempPortInvalid = true;
+		}
+		portInvalid = tempPortInvalid;
 	}
 
 	/**
@@ -166,9 +225,44 @@ public class Message {
 	}
 
 	/**
+	 * Returns true iff the decryption of the inbound message failed.
+	 */
+	public boolean decryptionFailed() {
+		return decryptionFailed;
+	}
+
+	/**
+	 * Returns true iff the encryption type of the inbound message is unsupported.
+	 */
+	public boolean encryptionTypeUnsupported() {
+		return encryptionTypeUnsupported;
+	}
+	
+	/**
+	 * Returns true iff the file size of the proposed inbound file transfer is invalid.
+	 */
+	public boolean fileSizeInvalid() {
+		return fileSizeInvalid;
+	}
+
+	/**
+	 * Returns true iff the encryption type of the proposed inbound file transfer is unsupported.
+	 */
+	public boolean fileEncryptionTypeUnsupported() {
+		return fileEncryptionTypeUnsupported;
+	}
+	
+	/**
+	 * Returns true iff port of the accepted outbound file transfer is not a number or is negative
+	 */
+	public boolean portInvalid() {
+		return portInvalid;
+	}
+
+	/**
 	 * Factory method for outbound text messages.
 	 */
-	public static Message createMessage(String text, String encryptionType, String color, String sender)
+	public static Message createMessage(String text, String encryptionType, Color color, String sender)
 			throws EncryptionException, UnsupportedEncryptionTypeException {
 		return new Message(text, encryptionType, color, "", "", "", "", "", "", sender, 0);
 	}
@@ -176,41 +270,56 @@ public class Message {
 	/**
 	 * Factory method for inbound text messages.
 	 */
-	public static Message createMessage(List<List<String>> textList, String color, String sender)
-			throws EncryptionException, UnsupportedEncryptionTypeException {
+	public static Message createMessage(List<List<String>> textList, String color, String sender) {
 		return new Message(textList, color, "", "", "", "", "", "", "", sender, 0);
 	}
 
 	/**
 	 * Factory method for outbound connection request messages.
 	 */
-	public static Message createConnectionRequest(String text, String encryptionType, String color, String sender)
-			throws EncryptionException, UnsupportedEncryptionTypeException {
-		return new Message(text, encryptionType, color, "", "", "", "", "", "", sender, 1);
+	public static Message createConnectionRequest(String text, Color color, String sender) {
+		try {
+			return new Message(text, "", color, "", "", "", "", "", "", sender, 1);
+		//} catch (EncryptionException | UnsupportedEncryptionTypeException e) {
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(-1);
+			throw null;
+		}
 	}
 
 	/**
 	 * Factory method for inbound connection request messages.
 	 */
-	public static Message createConnectionRequest(List<List<String>> textList, String color, String sender)
-			throws EncryptionException, UnsupportedEncryptionTypeException {
+	public static Message createConnectionRequest(List<List<String>> textList, String color, String sender) {
 		return new Message(textList, color, "", "", "", "", "", "", "", sender, 1);
 	}
 
 	/**
-	 * Factory method for connection response messages.
-	 * @param outbound indicates whether the message is being sent or received
+	 * Factory method for outbound connection response messages.
 	 */
-	public static Message createConnectionResponse(boolean outbound, String sender)
-			throws EncryptionException, UnsupportedEncryptionTypeException {
-		if (outbound) return new Message("", "", "", "", "", "", "", "", "no", sender, 4);
-		return new Message(new ArrayList<List<String>>(), "", "", "", "", "", "", "", "no", sender, 2);
+	public static Message createConnectionResponse(String sender) {
+		try {
+			return new Message("", "", null, "", "", "", "", "", no, sender, 2);
+		//} catch (EncryptionException | UnsupportedEncryptionTypeException e) {
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(-1);
+			throw null;
+		}
+	}
+	
+	/**
+	 * Factory method for inbound connection response messages.
+	 */
+	public static Message createConnectionResponse(String reply, String sender) {
+		return new Message(new ArrayList<List<String>>(), "", "", "", "", "", "", "", reply, sender, 2);
 	}
 
 	/**
 	 * Factory method for outbound file request messages.
 	 */
-	public static Message createFileRequest(String text, String encryptionType, String color, String fileName,
+	public static Message createFileRequest(String text, String encryptionType, Color color, String fileName,
 											String fileSize, String fileEncryptionType, String sender)
 			throws EncryptionException, UnsupportedEncryptionTypeException {
 		return new Message(text, encryptionType, color, fileName, fileSize, fileEncryptionType, "", "", "", sender, 3);
@@ -220,15 +329,14 @@ public class Message {
 	 * Factory method for inbound file request messages.
 	 */
 	public static Message createFileRequest(List<List<String>> textList, String color, String fileName,
-											String fileSize, String fileEncryptionType, String fileKey, String sender)
-			throws EncryptionException, UnsupportedEncryptionTypeException {
+											String fileSize, String fileEncryptionType, String fileKey, String sender) {
 		return new Message(textList, color, fileName, fileSize, fileEncryptionType, fileKey, "", "", "", sender, 3);
 	}
 
 	/**
 	 * Factory method for outbound file response messages.
 	 */
-	public static Message createFileResponse(String text, String encryptionType, String color, String fileReply,
+	public static Message createFileResponse(String text, String encryptionType, Color color, String fileReply,
 											 String port, String sender)
 			throws EncryptionException, UnsupportedEncryptionTypeException {
 		return new Message(text, encryptionType, color, "", "", "", fileReply, port, "", sender, 4);
@@ -238,8 +346,7 @@ public class Message {
 	 * Factory method for inbound file response messages.
 	 */
 	public static Message createFileResponse(List<List<String>> textList, String color, String fileReply, String port,
-											 String sender)
-			throws EncryptionException, UnsupportedEncryptionTypeException {
+											 String sender) {
 		return new Message(textList, color, "", "", "", "", fileReply, port, "", sender, 4);
 	}
 
@@ -247,17 +354,21 @@ public class Message {
 	 * Factory method for disconnect messages.
 	 * @param outbound indicates whether the message is being sent or received
 	 */
-	public static Message createDisconnect(boolean outbound, String sender)
-			throws EncryptionException, UnsupportedEncryptionTypeException {
-		if (outbound) return new Message("", "", "", "", "", "", "", "", "", sender, 5);
+	public static Message createDisconnect(boolean outbound, String sender) {
+		if (outbound) try {
+			return new Message("", "", null, "", "", "", "", "", "", sender, 5);
+		//} catch (EncryptionException | UnsupportedEncryptionTypeException e) {
+		} catch (Exception e) {
+			e.printStackTrace();
+			System.exit(-1);
+		}
 		return new Message(new ArrayList<List<String>>(), "", "", "", "", "", "", "", "", sender, 5);
 	}
 
 	/**
 	 * Factory method for key request messages (always inbound).
 	 */
-	public static Message createKeyRequest(String sender)
-			throws EncryptionException, UnsupportedEncryptionTypeException {
+	public static Message createKeyRequest(String sender) {
 		return new Message(new ArrayList<List<String>>(), "", "", "", "", "", "", "", "", sender, 6);
 	}
 }

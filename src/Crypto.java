@@ -78,7 +78,7 @@ public class Crypto {
 	 * @throws EncryptionException if something goes wrong while encrypting
 	 * @throws UnsupportedEncryptionTypeException if the given encryption type isn't supported.
 	 */
-	public static byte[] encrypt(String encryptionType, byte[] data)
+	public static byte[] encrypt(byte[] data, String encryptionType)
 			throws EncryptionException, UnsupportedEncryptionTypeException {
 		if (isAES(encryptionType)) return AES.encrypt(data);
 		if (isCaesar(encryptionType)) return Caesar.encrypt(data);
@@ -90,7 +90,7 @@ public class Crypto {
 	 * @throws EncryptionException if something goes wrong while decrypting
 	 * @throws UnsupportedEncryptionTypeException if the given encryption type isn't supported.
 	 */
-	public static byte[] decrypt(String encryptionType, byte[] data, String decryptKeyHex)
+	public static byte[] decrypt(byte[] data, String decryptKeyHex, String encryptionType)
 			throws EncryptionException, UnsupportedEncryptionTypeException {
 		if (isAES(encryptionType)) return AES.decrypt(data, hexToBytes(decryptKeyHex));
 		if (isCaesar(encryptionType)) return Caesar.decrypt(data, hexToInt(decryptKeyHex));
@@ -102,9 +102,9 @@ public class Crypto {
 	 * @throws EncryptionException if something goes wrong while encrypting
 	 * @throws UnsupportedEncryptionTypeException if the given encryption type isn't supported.
 	 */
-	public static String encrypt(String encryptionType, String text)
+	public static String encrypt(String text, String encryptionType)
 			throws EncryptionException, UnsupportedEncryptionTypeException {
-		return bytesToHex(encrypt(encryptionType, stringToBytes(text)));
+		return bytesToHex(encrypt(stringToBytes(text), encryptionType));
 	}
 
 	/**
@@ -112,9 +112,9 @@ public class Crypto {
 	 * @throws EncryptionException if something goes wrong while decrypting
 	 * @throws UnsupportedEncryptionTypeException if the given encryption type isn't supported.
 	 */
-	public static String decrypt(String encryptionType, String textHex, String decryptKeyHex)
+	public static String decrypt(String textHex, String decryptKeyHex, String encryptionType)
 			throws EncryptionException, UnsupportedEncryptionTypeException {
-		return bytesToString(decrypt(encryptionType, hexToBytes(textHex), decryptKeyHex));
+		return bytesToString(decrypt(hexToBytes(textHex), decryptKeyHex, encryptionType));
 	}
 
 	/**
@@ -125,5 +125,12 @@ public class Crypto {
 		if (isAES(encryptionType)) return encryptKeyHexAES;
 		if (isCaesar(encryptionType)) return encryptKeyHexCaesar;
 		throw new UnsupportedEncryptionTypeException();
+	}
+
+	/**
+	 * Returns true iff the given encryption type is supported
+	 */
+	public static boolean isSupported(String encryptionType) {
+		return isAES(encryptionType) || isCaesar(encryptionType);
 	}
 }

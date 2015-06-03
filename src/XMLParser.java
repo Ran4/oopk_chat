@@ -1,5 +1,5 @@
 import java.io.StringReader;
-import java.io.IOException;
+//import java.io.IOException;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -10,7 +10,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.w3c.dom.Node;
 import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
+//import org.xml.sax.SAXException;
 
 /**
  * This class contains methods for converting a text message in {@code Message} form into an XML {@code String}, and the
@@ -39,17 +39,6 @@ public class XMLParser {
 		static final String PORT = "port";
 		static final String TYPE = "type";
 		static final String KEY = "key";
-	}
-
-	private static final DocumentBuilder builder;
-
-	static {
-		try {
-			builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
-		} catch (ParserConfigurationException e) {
-			throw new Error(e.getClass() + " in XMLParser initializer: " + e.getMessage());
-		}
-		builder.setErrorHandler(null);
 	}
 
 	/**
@@ -92,6 +81,8 @@ public class XMLParser {
 			attributes.add(msg.connectionReply);
 		} else if (msg.isFileRequest()) {
 			contentType = Tag.FILEREQUEST;
+			attributes.add(Attribute.NAME);
+			attributes.add(msg.fileName);
 			attributes.add(Attribute.SIZE);
 			attributes.add(msg.fileSize);
 			if (!msg.fileEncryptionType.isEmpty()) {
@@ -131,8 +122,15 @@ public class XMLParser {
 	 * @throws EncryptionException if something went wrong while decrypting the message, such as a bad key.
 	 * @throws UnsupportedEncryptionException if the xml contains encryption of an unsupported type.
 	 */
-	public static Message XMLToMsg(String xml)
-			throws XMLException, EncryptionException, UnsupportedEncryptionTypeException {
+	public static Message XMLToMsg(String xml) throws XMLException {
+		DocumentBuilder builder;
+		try {
+			builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+		} catch (ParserConfigurationException e) {
+			e.printStackTrace();
+			throw new XMLException();
+		}
+		builder.setErrorHandler(null);
 
 		Element root;
 		try {
@@ -161,8 +159,8 @@ public class XMLParser {
 				return Message.createMessage(textList, color, sender);
 			}
 			if (tagName.equals(Tag.REQUEST)) {
-				if (child.getAttribute(Attribute.REPLY).equalsIgnoreCase("no"))
-					return Message.createConnectionResponse(false, sender);
+				if (child.hasAttribute(Attribute.REPLY))
+					return Message.createConnectionResponse(child.getAttribute(Attribute.REPLY), sender);
 				addText(textList, child);
 				String color = child.getAttribute(Attribute.COLOR);
 				return Message.createConnectionRequest(textList, color, sender);

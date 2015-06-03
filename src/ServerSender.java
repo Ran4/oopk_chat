@@ -13,6 +13,7 @@ public class ServerSender{
     public ServerSender(PrintWriter _writer) {
         writer = _writer;
     }
+    
     public void sendMessage(String msg) throws IOException{
         writer.println(msg);
         writer.flush();
